@@ -1,0 +1,314 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Quantioa Docker Compose — Full Microservices Stack
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Services:
+#   - api-gateway     : FastAPI gateway (port 8000)
+#   - auth-service    : Authentication + OAuth2 (port 8001)
+#   - trading-engine  : Signal generation + trade execution (port 8002)
+#   - data-service    : Market data collection + streaming (port 8003)
+#   - risk-service    : Risk management + circuit breakers (port 8004)
+#   - ai-service      : AI/LLM orchestration (Kimi K2.5 + Perplexity) (port 8005)
+#   - analytics       : Performance tracking + metrics (port 8006)
+#   - broker-service  : Broker integration (Upstox) (port 8007)
+#
+# Infrastructure:
+#   - postgres        : Primary database (port 5432)
+#   - redis           : Caching, sessions, rate limiting (port 6379)
+#   - kafka           : Event bus (port 9092)
+#   - zookeeper       : Kafka dependency (port 2181)
+#
+# Usage:
+#   docker compose up -d                 # Start all
+#   docker compose up api-gateway        # Start gateway + its dependencies
+#   docker compose logs -f trading-engine # Tail trading engine logs
+#   docker compose down -v               # Stop + remove volumes
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: quantioa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quantioa
+      POSTGRES_USER: quantioa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U quantioa" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quantioa-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: quantioa-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quantioa-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: quantioa-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - quantioa-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: quantioa-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - quantioa-net
+
+  # ─── Application Services ───────────────────────────────────────────────
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway.Dockerfile
+    container_name: quantioa-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: api-gateway
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-auth
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: auth-service
+      SERVICE_MODULE: quantioa.services.auth.main
+      REDIS_URL: redis://redis:6379/1
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  trading-engine:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-trading
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: trading-engine
+      SERVICE_MODULE: quantioa.services.trading.main
+      REDIS_URL: redis://redis:6379/2
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  data-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-data
+    restart: unless-stopped
+    ports:
+      - "8003:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: data-service
+      SERVICE_MODULE: quantioa.services.data.main
+      REDIS_URL: redis://redis:6379/3
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  risk-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-risk
+    restart: unless-stopped
+    ports:
+      - "8004:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: risk-service
+      SERVICE_MODULE: quantioa.services.risk.main
+      REDIS_URL: redis://redis:6379/4
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-ai
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: ai-service
+      SERVICE_MODULE: quantioa.services.ai.main
+      REDIS_URL: redis://redis:6379/5
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-analytics
+    restart: unless-stopped
+    ports:
+      - "8006:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: analytics-service
+      SERVICE_MODULE: quantioa.services.analytics.main
+      REDIS_URL: redis://redis:6379/6
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+  broker-service:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    container_name: quantioa-broker
+    restart: unless-stopped
+    ports:
+      - "8007:8000"
+    env_file: .env
+    environment:
+      SERVICE_NAME: broker-service
+      SERVICE_MODULE: quantioa.services.broker.main
+      REDIS_URL: redis://redis:6379/7
+      POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
+      UPSTOX_API_KEY: ${UPSTOX_API_KEY}
+      UPSTOX_API_SECRET: ${UPSTOX_API_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quantioa-net
+
+# ─── Volumes ────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+# ─── Networks ───────────────────────────────────────────────────────────────
+
+networks:
+  quantioa-net:
+    driver: bridge
+    name: quantioa-network

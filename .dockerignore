@@ -1,0 +1,18 @@
+# Quantioa Docker
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+.env
+.git/
+.github/
+.ruff_cache/
+.pytest_cache/
+*.md
+!README.md
+docs/
+tests/
+.mypy_cache/

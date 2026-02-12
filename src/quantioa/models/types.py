@@ -1,0 +1,277 @@
+"""Core data types (dataclasses) used throughout the trading platform."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
+
+from quantioa.models.enums import (
+    AnomalyType,
+    CircuitBreakerAction,
+    ExecutionStrategy,
+    OrderStatus,
+    OrderType,
+    PositionStatus,
+    SentimentType,
+    TradeSignal,
+    TradeSide,
+    VolatilityRegime,
+)
+
+
+# ─── Market Data ───────────────────────────────────────────────────────────────
+
+
+@dataclass(slots=True)
+class Tick:
+    """Single market tick (OHLCV price update)."""
+
+    timestamp: float
+    symbol: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+@dataclass(slots=True)
+class Quote:
+    """Normalized broker quote."""
+
+    symbol: str
+    price: float
+    bid: float
+    ask: float
+    volume: float
+    timestamp: float
+
+
+@dataclass(slots=True)
+class OrderBookLevel:
+    """Single level in the order book (bid or ask)."""
+
+    price: float
+    quantity: int
+    orders: int = 0
+
+
+@dataclass(slots=True)
+class OrderBookSnapshot:
+    """Order book depth snapshot."""
+
+    symbol: str
+    bids: list[OrderBookLevel]
+    asks: list[OrderBookLevel]
+    timestamp: float
+
+
+# ─── Orders & Positions ───────────────────────────────────────────────────────
+
+
+@dataclass
+class Order:
+    """Order to be placed with a broker."""
+
+    symbol: str
+    side: TradeSide
+    quantity: int
+    order_type: OrderType = OrderType.MARKET
+    price: float | None = None  # Required for LIMIT orders
+    stop_loss: float | None = None
+    target: float | None = None
+
+
+@dataclass
+class OrderResponse:
+    """Normalized response after placing an order."""
+
+    order_id: str
+    status: OrderStatus
+    symbol: str
+    side: TradeSide
+    quantity: int
+    filled_price: float | None = None
+    filled_quantity: int = 0
+    message: str = ""
+    timestamp: float = 0.0
+
+
+@dataclass
+class Position:
+    """A currently held position."""
+
+    id: str
+    symbol: str
+    side: TradeSide
+    quantity: int
+    entry_price: float
+    current_price: float = 0.0
+    stop_loss: float | None = None
+    target: float | None = None
+    entry_time: float = 0.0
+    status: PositionStatus = PositionStatus.OPEN
+    strategy_id: str = ""
+
+    @property
+    def unrealized_pnl(self) -> float:
+        multiplier = 1.0 if self.side == TradeSide.LONG else -1.0
+        return multiplier * (self.current_price - self.entry_price) * self.quantity
+
+    @property
+    def unrealized_pnl_pct(self) -> float:
+        if self.entry_price == 0:
+            return 0.0
+        multiplier = 1.0 if self.side == TradeSide.LONG else -1.0
+        return multiplier * (self.current_price - self.entry_price) / self.entry_price * 100
+
+
+@dataclass
+class TradeResult:
+    """Completed trade (closed position)."""
+
+    id: str
+    symbol: str
+    side: TradeSide
+    quantity: int
+    entry_price: float
+    exit_price: float
+    entry_time: float
+    exit_time: float
+    exit_reason: str = ""
+    strategy_id: str = ""
+
+    @property
+    def pnl(self) -> float:
+        multiplier = 1.0 if self.side == TradeSide.LONG else -1.0
+        return multiplier * (self.exit_price - self.entry_price) * self.quantity
+
+    @property
+    def pnl_pct(self) -> float:
+        if self.entry_price == 0:
+            return 0.0
+        multiplier = 1.0 if self.side == TradeSide.LONG else -1.0
+        return multiplier * (self.exit_price - self.entry_price) / self.entry_price * 100
+
+    @property
+    def is_winner(self) -> bool:
+        return self.pnl > 0
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.exit_time - self.entry_time
+
+
+# ─── Indicator & Signal Outputs ────────────────────────────────────────────────
+
+
+@dataclass
+class IndicatorSnapshot:
+    """Full snapshot of all indicator values at a point in time."""
+
+    # Trend
+    sma_20: float = 0.0
+    sma_50: float = 0.0
+    ema_9: float = 0.0
+    ema_21: float = 0.0
+    ema_55: float = 0.0
+
+    # Momentum
+    rsi: float = 50.0
+    macd_line: float = 0.0
+    macd_signal: float = 0.0
+    macd_hist: float = 0.0
+
+    # Volatility
+    atr: float = 0.0
+    keltner_upper: float = 0.0
+    keltner_mid: float = 0.0
+    keltner_lower: float = 0.0
+
+    # Volume
+    obv: float = 0.0
+    vwap: float = 0.0
+
+    # Binary signals
+    signal_price_above_sma20: int = 0
+    signal_ema_9_gt_21: int = 0
+    signal_macd_positive: int = 0
+    signal_rsi_oversold: int = 0
+    signal_rsi_overbought: int = 0
+    signal_price_above_vwap: int = 0
+
+
+@dataclass
+class SignalResult:
+    """Output of the signal generation pipeline."""
+
+    signal: TradeSignal
+    strength: float  # 0.0 to 1.0
+    confidence: float  # 0.0 to 1.0
+    reasoning: str = ""
+    technical_score: float = 0.0
+    sentiment_score: float = 0.0
+    mtf_agreement: float = 0.0
+    regime: VolatilityRegime = VolatilityRegime.NORMAL
+    kelly_position_size: float = 0.0
+    recommended_stop_loss: float = 0.0
+    recommended_target: float = 0.0
+
+
+# ─── Risk ──────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class RiskMetrics:
+    """Portfolio-level risk metrics."""
+
+    current_equity: float = 0.0
+    peak_equity: float = 0.0
+    daily_pnl: float = 0.0
+    weekly_pnl: float = 0.0
+    drawdown_pct: float = 0.0
+    daily_loss_pct: float = 0.0
+    open_positions: int = 0
+    is_trading_allowed: bool = True
+    halt_reason: str = ""
+
+
+@dataclass
+class AnomalyEvent:
+    """Detected market anomaly."""
+
+    anomaly_type: AnomalyType
+    severity: float  # z-score or ratio
+    action: CircuitBreakerAction
+    message: str
+    timestamp: float = 0.0
+
+
+# ─── Sentiment ─────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class SentimentResult:
+    """Output of sentiment analysis for a symbol."""
+
+    symbol: str
+    score: float  # -1.0 to +1.0
+    sentiment_type: SentimentType
+    confidence: float  # 0.0 to 1.0
+    sources_count: int = 0
+    headlines: list[str] = field(default_factory=list)
+    timestamp: float = 0.0
+
+
+# ─── Execution ─────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class ExecutionPlan:
+    """Recommended execution approach for an order."""
+
+    strategy: ExecutionStrategy
+    predicted_slippage_pct: float
+    predicted_cost: float
+    reasoning: str = ""

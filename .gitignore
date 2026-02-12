@@ -1,0 +1,99 @@
+# =============================================================================
+# Quantioa — .gitignore
+# =============================================================================
+
+# ─── Secrets & Credentials ──────────────────────────────────────────────────
+# CRITICAL: Never commit actual secrets
+.env
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.keystore
+*_secret*
+*_token*
+!src/quantioa/broker/token_store.py
+tokens/
+secrets/
+
+# ─── Internal / Confidential Documents ─────────────────────────────────────
+# PRD, specs, research — not for public repos
+docs/
+
+# ─── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+pip-wheel-metadata/
+*.manifest
+*.spec
+MANIFEST
+
+# ─── Virtual Environments ──────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ─── IDE / Editor ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ─── Testing / Coverage ───────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ─── Type Checking / Linting ──────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# ─── Docker ────────────────────────────────────────────────────────────────
+# Don't commit Docker volume data
+postgres_data/
+redis_data/
+kafka_data/
+zookeeper_data/
+
+# ─── OS Files ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# ─── Logs ──────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Miscellaneous ─────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+.cache/
