@@ -31,9 +31,14 @@ class Settings(BaseSettings):
     upstox_api_secret: str = ""
     upstox_redirect_uri: str = "http://localhost:8000/api/v1/oauth/upstox/callback"
     upstox_base_url: str = "https://api.upstox.com/v2"
+    upstox_hft_base_url: str = "https://api-hft.upstox.com/v3"
     upstox_auth_url: str = "https://api.upstox.com/v2/login/authorization/dialog"
     upstox_token_url: str = "https://api.upstox.com/v2/login/authorization/token"
     upstox_ws_url: str = "wss://api.upstox.com/v2/feed/market-data-feed"
+    upstox_ws_market_auth_url: str = "https://api.upstox.com/v3/feed/market-data-feed/authorize"
+    upstox_ws_portfolio_url: str = "wss://api.upstox.com/v2/feed/portfolio-stream-feed"
+    upstox_sandbox_mode: bool = False
+    upstox_webhook_enabled: bool = False
 
     # --- OpenRouter (DeepSeek + Perplexity) ---
     openrouter_api_key: str = ""

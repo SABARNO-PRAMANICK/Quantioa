@@ -70,3 +70,30 @@ class BrokerAdapter(ABC):
     async def get_account_balance(self) -> float:
         """Get available account balance / margin."""
         ...
+
+    @abstractmethod
+    async def modify_order(
+        self,
+        order_id: str,
+        quantity: int | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        order_type: str | None = None,
+    ) -> OrderResponse:
+        """Modify a pending order. Returns the updated order response."""
+        ...
+
+    @abstractmethod
+    async def get_order_status(self, order_id: str) -> OrderResponse:
+        """Get current status/details of a specific order."""
+        ...
+
+    @abstractmethod
+    async def get_order_book(self) -> list[OrderResponse]:
+        """Get all orders placed today."""
+        ...
+
+    @abstractmethod
+    async def get_trades(self) -> list[dict]:
+        """Get all trades executed today."""
+        ...

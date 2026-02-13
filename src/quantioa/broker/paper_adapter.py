@@ -219,6 +219,98 @@ class PaperTradingAdapter(BrokerAdapter):
             "initial_capital": self._initial_capital,
         }
 
+    # ─── New Interface Methods (Paper Stubs) ─────────────────────────────
+
+    async def modify_order(
+        self,
+        order_id: str,
+        quantity: int | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        order_type: str | None = None,
+    ) -> OrderResponse:
+        """Paper trading: log modification and return success."""
+        logger.info(
+            "PAPER MODIFY %s qty=%s price=%s", order_id, quantity, price
+        )
+        # Find the original order to return a sensible response
+        for o in self._orders:
+            if o.order_id == order_id:
+                return OrderResponse(
+                    order_id=order_id,
+                    status=OrderStatus.FILLED,
+                    symbol=o.symbol,
+                    side=TradeSide.LONG if o.side == "LONG" else TradeSide.SHORT,
+                    quantity=quantity or o.quantity,
+                    filled_price=price or o.price,
+                    filled_quantity=quantity or o.quantity,
+                    timestamp=time.time(),
+                )
+        # Order not found — return a dummy
+        return OrderResponse(
+            order_id=order_id,
+            status=OrderStatus.REJECTED,
+            symbol="",
+            side=TradeSide.LONG,
+            quantity=0,
+            message="Order not found in paper trading history",
+            timestamp=time.time(),
+        )
+
+    async def get_order_status(self, order_id: str) -> OrderResponse:
+        """Look up a paper order by ID."""
+        for o in self._orders:
+            if o.order_id == order_id:
+                return OrderResponse(
+                    order_id=order_id,
+                    status=OrderStatus.FILLED,
+                    symbol=o.symbol,
+                    side=TradeSide.LONG if o.side == "LONG" else TradeSide.SHORT,
+                    quantity=o.quantity,
+                    filled_price=o.price,
+                    filled_quantity=o.quantity,
+                    timestamp=o.timestamp,
+                )
+        return OrderResponse(
+            order_id=order_id,
+            status=OrderStatus.REJECTED,
+            symbol="",
+            side=TradeSide.LONG,
+            quantity=0,
+            message="Order not found",
+            timestamp=time.time(),
+        )
+
+    async def get_order_book(self) -> list[OrderResponse]:
+        """Return all paper orders as OrderResponse list."""
+        return [
+            OrderResponse(
+                order_id=o.order_id,
+                status=OrderStatus.FILLED,
+                symbol=o.symbol,
+                side=TradeSide.LONG if o.side == "LONG" else TradeSide.SHORT,
+                quantity=o.quantity,
+                filled_price=o.price,
+                filled_quantity=o.quantity,
+                timestamp=o.timestamp,
+            )
+            for o in self._orders
+        ]
+
+    async def get_trades(self) -> list[dict]:
+        """Return all paper trades as dicts."""
+        return [
+            {
+                "order_id": o.order_id,
+                "symbol": o.symbol,
+                "side": o.side,
+                "quantity": o.quantity,
+                "price": o.price,
+                "timestamp": o.timestamp,
+            }
+            for o in self._orders
+        ]
+
     # ─── Paper-Specific ───────────────────────────────────────────────────
 
     def summary(self) -> str:
@@ -247,3 +339,4 @@ class PaperTradingAdapter(BrokerAdapter):
             f"Open Positions:  {len(self._positions)}\n"
             f"Total Orders:    {len(self._orders)}"
         )
+

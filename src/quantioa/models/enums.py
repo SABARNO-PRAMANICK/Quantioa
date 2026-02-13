@@ -26,6 +26,8 @@ class TradeSide(str, Enum):
 class OrderType(str, Enum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
+    SL = "SL"
+    SL_M = "SL-M"
 
 
 class OrderStatus(str, Enum):
@@ -40,6 +42,34 @@ class PositionStatus(str, Enum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
     PENDING = "PENDING"
+
+
+class ProductType(str, Enum):
+    """Upstox product types."""
+
+    INTRADAY = "I"
+    DELIVERY = "D"
+    MTF = "MTF"
+
+
+class OrderValidity(str, Enum):
+    """Order validity types."""
+
+    DAY = "DAY"
+    IOC = "IOC"
+
+
+class MarketSegment(str, Enum):
+    """Exchange market segments."""
+
+    NSE_EQ = "NSE_EQ"
+    BSE_EQ = "BSE_EQ"
+    NSE_FO = "NSE_FO"
+    BSE_FO = "BSE_FO"
+    MCX_FO = "MCX_FO"
+    NCD_FO = "NCD_FO"
+    BCD_FO = "BCD_FO"
+    NSE_COM = "NSE_COM"
 
 
 # ─── Volatility & Regimes ─────────────────────────────────────────────────────

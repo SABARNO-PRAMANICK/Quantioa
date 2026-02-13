@@ -12,7 +12,9 @@ from quantioa.models.enums import (
     ExecutionStrategy,
     OrderStatus,
     OrderType,
+    OrderValidity,
     PositionStatus,
+    ProductType,
     SentimentType,
     TradeSignal,
     TradeSide,
@@ -81,6 +83,12 @@ class Order:
     price: float | None = None  # Required for LIMIT orders
     stop_loss: float | None = None
     target: float | None = None
+    product: ProductType = ProductType.INTRADAY
+    validity: OrderValidity = OrderValidity.DAY
+    trigger_price: float = 0.0  # For SL / SL-M orders
+    tag: str = "quantioa"  # Order tag for tracking
+    is_amo: bool = False  # After Market Order
+    slice: bool = False  # Auto-slice large orders
 
 
 @dataclass
@@ -96,6 +104,9 @@ class OrderResponse:
     filled_quantity: int = 0
     message: str = ""
     timestamp: float = 0.0
+    latency_ms: int = 0  # V3 API processing latency
+    exchange_order_id: str = ""  # Exchange-assigned order ID
+    average_price: float = 0.0  # Average fill price
 
 
 @dataclass
