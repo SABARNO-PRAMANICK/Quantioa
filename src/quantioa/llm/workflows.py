@@ -141,31 +141,43 @@ async def optimize_parameters(state: TradingDecisionState) -> TradingDecisionSta
 
 
 async def analyze_sentiment(state: TradingDecisionState) -> TradingDecisionState:
-    """Node 3: Get market sentiment via Perplexity Sonar Pro.
+    """Node 3: Read cached market sentiment (from Redis/memory).
 
-    Queries recent news and social sentiment for the symbol.
+    The trading agent NEVER calls Perplexity Sonar Pro directly.
+    It reads whatever the separate Sentiment Service has cached.
+    If no cached sentiment exists, returns neutral values.
     """
     symbol = state.get("symbol", "NIFTY50")
 
     try:
-        result = await sentiment_query(
-            prompt=sent_prompts.user_prompt(symbol),
-            system_prompt=sent_prompts.SYSTEM,
-        )
-        parsed = _extract_json(result)
+        from quantioa.services.sentiment.cache import SentimentCache
+        from quantioa.services.sentiment.reader import SentimentReader
+
+        cache = SentimentCache(redis_url=None)  # will use memory fallback
+        await cache.connect()
+        reader = SentimentReader(cache)
+        sentiment = await reader.get_sentiment(symbol)
+
+        if sentiment.available:
+            logger.info(
+                "Using cached sentiment for %s (score=%.2f, age=%.1fh, stale=%s)",
+                symbol, sentiment.score, sentiment.age_hours, sentiment.stale,
+            )
+        else:
+            logger.info("No cached sentiment for %s, using neutral", symbol)
 
         return {
             **state,
-            "sentiment_text": parsed.get("summary", result),
-            "sentiment_score": float(parsed.get("score", 0.0)),
+            "sentiment_text": sentiment.summary,
+            "sentiment_score": sentiment.score,
         }
     except Exception as e:
-        logger.error("Sentiment analysis failed: %s", e)
+        logger.error("Sentiment cache read failed: %s", e)
         return {
             **state,
             "sentiment_text": "Sentiment analysis unavailable",
             "sentiment_score": 0.0,
-            "error": f"Sentiment failed: {e}",
+            "error": f"Sentiment cache read failed: {e}",
         }
 
 

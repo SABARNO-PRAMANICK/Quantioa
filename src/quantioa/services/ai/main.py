@@ -94,17 +94,49 @@ async def optimize_simple(req: OptimizationRequest):
 
 
 @app.post("/sentiment/{symbol}")
-async def analyze_sentiment(symbol: str):
-    """Get AI-powered sentiment analysis via Perplexity Sonar Pro."""
-    from quantioa.llm.client import sentiment_query
-    from quantioa.prompts import sentiment as sent_prompts
+async def get_sentiment(symbol: str):
+    """Read cached sentiment for a symbol (from Redis/memory).
 
-    result = await sentiment_query(
-        prompt=sent_prompts.user_prompt_short(symbol),
-        system_prompt=sent_prompts.SYSTEM_SHORT,
-    )
+    The trading agent calls this endpoint — it NEVER calls Perplexity.
+    """
+    from quantioa.services.sentiment.cache import SentimentCache
+    from quantioa.services.sentiment.reader import SentimentReader
 
-    return {"symbol": symbol, "model": settings.perplexity_model, "analysis": result}
+    cache = SentimentCache(redis_url=None)
+    await cache.connect()
+    reader = SentimentReader(cache)
+    sentiment = await reader.get_sentiment(symbol)
+
+    return {
+        "symbol": symbol,
+        "score": sentiment.score,
+        "summary": sentiment.summary,
+        "headlines": sentiment.headlines,
+        "confidence": sentiment.confidence,
+        "stale": sentiment.stale,
+        "age_hours": sentiment.age_hours,
+        "available": sentiment.available,
+    }
+
+
+@app.post("/sentiment/{symbol}/refresh")
+async def refresh_sentiment(symbol: str):
+    """Admin endpoint: manually refresh sentiment for a symbol.
+
+    This is the ONLY AI service endpoint that calls Perplexity.
+    Should be called sparingly — the Sentiment Service handles
+    automatic 6-hour refreshes.
+    """
+    from quantioa.services.sentiment.service import SentimentService
+
+    service = SentimentService()
+    await service.cache.connect()
+    success = await service.refresh_symbol(symbol)
+
+    if not success:
+        raise HTTPException(status_code=502, detail="Sentiment refresh failed")
+
+    return {"symbol": symbol, "status": "refreshed"}
 
 
 @app.post("/chat")
