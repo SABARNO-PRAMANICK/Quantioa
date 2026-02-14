@@ -13,12 +13,54 @@ Workflows:
 
 from __future__ import annotations
 
+import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from quantioa.config import settings
+from quantioa.services.sentiment.cache import SentimentCache
+from quantioa.services.sentiment.reader import SentimentReader
 
-app = FastAPI(title="Quantioa AI Service", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+
+# ─── Shared State (module-level singletons) ──────────────────────────────────
+
+_sentiment_cache: SentimentCache | None = None
+
+
+def _get_redis_url() -> str | None:
+    """Resolve Redis URL from env (Docker sets this) or settings."""
+    return os.getenv("REDIS_URL") or settings.redis_url or None
+
+
+async def get_sentiment_cache() -> SentimentCache:
+    """Get or create the shared SentimentCache singleton."""
+    global _sentiment_cache
+    if _sentiment_cache is None:
+        redis_url = _get_redis_url()
+        _sentiment_cache = SentimentCache(redis_url=redis_url)
+        await _sentiment_cache.connect()
+        logger.info("Shared SentimentCache initialized (redis=%s)", redis_url)
+    return _sentiment_cache
+
+
+# ─── Lifespan ──────────────────────────────────────────────────────────────────
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize shared resources on startup."""
+    await get_sentiment_cache()
+    logger.info("AI Service started — model=%s", settings.ai_model)
+    yield
+    logger.info("AI Service shutting down")
+
+
+app = FastAPI(title="Quantioa AI Service", version="0.1.0", lifespan=lifespan)
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
@@ -29,11 +71,6 @@ class OptimizationRequest(BaseModel):
     indicators: dict[str, float] = {}
     current_params: dict[str, float] = {}
     recent_performance: dict[str, float] = {}
-
-
-class SentimentRequest(BaseModel):
-    symbol: str
-    include_news: bool = True
 
 
 class ChatRequest(BaseModel):
@@ -47,7 +84,13 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "ai-service", "model": settings.ai_model}
+    cache = await get_sentiment_cache()
+    return {
+        "status": "healthy",
+        "service": "ai-service",
+        "model": settings.ai_model,
+        "redis_connected": cache.is_redis_connected,
+    }
 
 
 @app.post("/optimize")
@@ -98,12 +141,9 @@ async def get_sentiment(symbol: str):
     """Read cached sentiment for a symbol (from Redis/memory).
 
     The trading agent calls this endpoint — it NEVER calls Perplexity.
+    Uses the shared SentimentCache singleton so data persists across requests.
     """
-    from quantioa.services.sentiment.cache import SentimentCache
-    from quantioa.services.sentiment.reader import SentimentReader
-
-    cache = SentimentCache(redis_url=None)
-    await cache.connect()
+    cache = await get_sentiment_cache()
     reader = SentimentReader(cache)
     sentiment = await reader.get_sentiment(symbol)
 
@@ -123,20 +163,33 @@ async def get_sentiment(symbol: str):
 async def refresh_sentiment(symbol: str):
     """Admin endpoint: manually refresh sentiment for a symbol.
 
-    This is the ONLY AI service endpoint that calls Perplexity.
-    Should be called sparingly — the Sentiment Service handles
-    automatic 6-hour refreshes.
+    Calls Perplexity Sonar Pro via OpenRouter, parses the JSON response,
+    and stores it in the shared SentimentCache (Redis or in-memory).
     """
     from quantioa.services.sentiment.service import SentimentService
 
-    service = SentimentService()
-    await service.cache.connect()
+    cache = await get_sentiment_cache()
+    service = SentimentService(cache=cache)
     success = await service.refresh_symbol(symbol)
 
     if not success:
         raise HTTPException(status_code=502, detail="Sentiment refresh failed")
 
-    return {"symbol": symbol, "status": "refreshed"}
+    # Return the freshly cached data so the user can see it immediately
+    reader = SentimentReader(cache)
+    sentiment = await reader.get_sentiment(symbol)
+
+    return {
+        "symbol": symbol,
+        "status": "refreshed",
+        "sentiment": {
+            "score": sentiment.score,
+            "summary": sentiment.summary,
+            "headlines": sentiment.headlines,
+            "confidence": sentiment.confidence,
+            "available": sentiment.available,
+        },
+    }
 
 
 @app.post("/chat")

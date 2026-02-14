@@ -19,6 +19,7 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -44,17 +45,27 @@ class SentimentService:
         self,
         symbols: list[str] | None = None,
         interval_hours: float = 6.0,
+        cache: SentimentCache | None = None,
         redis_url: str | None = None,
     ) -> None:
         self.symbols = symbols or DEFAULT_SYMBOLS
         self.interval_seconds = interval_hours * 3600
-        self.cache = SentimentCache(
-            redis_url=redis_url or os.getenv("REDIS_URL"),
-        )
+
+        if cache is not None:
+            # Use the injected cache (e.g. from AI service's shared singleton)
+            self.cache = cache
+            self._owns_cache = False
+        else:
+            # Create our own cache (standalone mode)
+            self.cache = SentimentCache(
+                redis_url=redis_url or os.getenv("REDIS_URL") or settings.redis_url,
+            )
+            self._owns_cache = True
 
     async def start(self) -> None:
         """Connect cache and begin refresh loop."""
-        await self.cache.connect()
+        if self._owns_cache:
+            await self.cache.connect()
         logger.info(
             "Sentiment Service started — tracking %s, refresh every %.0fh",
             self.symbols,
@@ -90,51 +101,95 @@ class SentimentService:
 
     async def refresh_symbol(self, symbol: str) -> bool:
         """Call Perplexity and cache the result for one symbol."""
-        logger.info("Refreshing sentiment for %s...", symbol)
+        logger.info("Refreshing sentiment for %s via Perplexity...", symbol)
 
         try:
             raw = await sentiment_query(
-                prompt=sent_prompts.user_prompt(symbol),
-                system_prompt=sent_prompts.SYSTEM,
+                prompt=sent_prompts.user_prompt_short(symbol),
+                system_prompt=sent_prompts.SYSTEM_SHORT,
             )
 
-            # Try to parse structured response
-            import json
+            logger.info(
+                "Perplexity raw response for %s (%d chars): %s",
+                symbol,
+                len(raw),
+                raw[:200],
+            )
 
-            try:
-                parsed = json.loads(raw)
-            except (json.JSONDecodeError, TypeError):
-                # Model returned free-text — wrap it
-                parsed = {
-                    "score": 0.0,
-                    "summary": raw if isinstance(raw, str) else str(raw),
-                    "headlines": [],
-                    "confidence": 0.3,
-                }
+            # Try to parse structured JSON response
+            parsed = self._parse_response(raw)
 
-            # Ensure required fields
+            # Ensure required fields with defaults
             data = {
                 "score": float(parsed.get("score", 0.0)),
-                "summary": str(parsed.get("summary", raw)),
+                "summary": str(parsed.get("summary", raw[:500])),
                 "headlines": parsed.get("headlines", []),
                 "confidence": float(parsed.get("confidence", 0.5)),
+                "risks": parsed.get("risks", []),
+                "catalysts": parsed.get("catalysts", []),
+                "detailed_analysis": str(parsed.get("detailed_analysis", "")),
                 "source": "perplexity_sonar_pro",
                 "model": settings.perplexity_model,
             }
 
             await self.cache.store(symbol, data)
             logger.info(
-                "✓ %s sentiment cached (score: %.2f)", symbol, data["score"]
+                "✓ %s sentiment cached (score: %.2f, confidence: %.2f)",
+                symbol,
+                data["score"],
+                data["confidence"],
             )
             return True
 
         except Exception as e:
-            logger.error("✗ Failed to refresh %s: %s", symbol, e)
+            logger.error("✗ Failed to refresh %s: %s", symbol, e, exc_info=True)
             return False
+
+    @staticmethod
+    def _parse_response(raw: str) -> dict:
+        """Parse the LLM response as JSON, handling common formatting issues."""
+        if not raw or not isinstance(raw, str):
+            return {"score": 0.0, "summary": str(raw), "confidence": 0.3}
+
+        text = raw.strip()
+
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            # Remove opening fence (```json or ```)
+            first_newline = text.index("\n") if "\n" in text else len(text)
+            text = text[first_newline + 1 :]
+            # Remove closing fence
+            if text.rstrip().endswith("```"):
+                text = text.rstrip()[:-3].rstrip()
+
+        # Try direct JSON parse
+        try:
+            return json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Try to find JSON object in the text
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Fallback: wrap raw text as summary
+        logger.warning("Could not parse Perplexity response as JSON, wrapping as text")
+        return {
+            "score": 0.0,
+            "summary": text[:500],
+            "headlines": [],
+            "confidence": 0.3,
+        }
 
     async def refresh_once(self) -> None:
         """One-shot refresh (no loop)."""
-        await self.cache.connect()
+        if self._owns_cache:
+            await self.cache.connect()
         await self.refresh_all()
 
 
@@ -152,7 +207,6 @@ async def main() -> None:
     service = SentimentService(
         symbols=symbols,
         interval_hours=interval,
-        redis_url=os.getenv("REDIS_URL"),
     )
 
     if "--once" in sys.argv:

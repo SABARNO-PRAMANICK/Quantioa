@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ai_model: str = "moonshotai/kimi-k2.5"
-    perplexity_model: str = "perplexity/sonar-deep-research"
+    perplexity_model: str = "perplexity/sonar-pro"
 
     # --- Redis ---
     redis_url: str = "redis://localhost:6379/0"

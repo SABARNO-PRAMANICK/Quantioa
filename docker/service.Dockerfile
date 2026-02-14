@@ -10,13 +10,13 @@ RUN groupadd -r quantioa && useradd -r -g quantioa -m quantioa
 
 WORKDIR /app
 
+# Copy everything needed for pip install (pyproject.toml needs README.md + src/)
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+
 # Install dependencies
-COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir "."
-
-# Copy source
-COPY src/ ./src/
 
 ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1

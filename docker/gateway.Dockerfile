@@ -10,11 +10,11 @@ RUN groupadd -r quantioa && useradd -r -g quantioa -m quantioa
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir "."
-
-COPY src/ ./src/
 
 ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1
