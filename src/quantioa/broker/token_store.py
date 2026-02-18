@@ -15,7 +15,8 @@ import logging
 import os
 from pathlib import Path
 
-from quantioa.broker.upstox_auth import TokenPair, UpstoxOAuth2
+from quantioa.broker.types import TokenPair
+from quantioa.broker.upstox_auth import UpstoxOAuth2
 from quantioa.config import settings
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def _token_to_dict(token: TokenPair) -> dict:
         "expires_at": token.expires_at,
         "refresh_token": token.refresh_token,
         "extended_token": token.extended_token,
+        "public_token": token.public_token,  # Added for Zerodha
         "user_id": token.user_id,
         "exchanges": token.exchanges,
         "products": token.products,
@@ -52,6 +54,7 @@ def _dict_to_token(data: dict) -> TokenPair:
         expires_at=data.get("expires_at", 0.0),
         refresh_token=data.get("refresh_token", ""),
         extended_token=data.get("extended_token", ""),
+        public_token=data.get("public_token", ""),  # Added for Zerodha
         user_id=data.get("user_id", ""),
         exchanges=data.get("exchanges", []),
         products=data.get("products", []),

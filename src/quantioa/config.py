@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     upstox_sandbox_mode: bool = False
     upstox_webhook_enabled: bool = False
 
+    # --- Zerodha Broker API ---
+    zerodha_api_key: str = ""
+    zerodha_api_secret: str = ""
+    zerodha_redirect_uri: str = "http://localhost:8000/api/v1/oauth/zerodha/callback"
+    zerodha_base_url: str = "https://api.kite.trade"
+    zerodha_auth_url: str = "https://kite.zerodha.com/connect/login"
+
+
     # --- OpenRouter (DeepSeek + Perplexity) ---
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"

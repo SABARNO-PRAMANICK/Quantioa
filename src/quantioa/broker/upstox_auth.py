@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 import httpx
-
+from quantioa.broker.types import TokenPair
 from quantioa.config import settings
 
 logger = logging.getLogger(__name__)
@@ -40,25 +40,6 @@ def _next_330am_ist_unix() -> float:
         target += timedelta(days=1)
 
     return target.timestamp()
-
-
-@dataclass
-class TokenPair:
-    """Access + refresh token with expiry metadata and user profile."""
-
-    access_token: str
-    token_type: str = "Bearer"
-    expires_at: float = 0.0  # Unix timestamp
-    refresh_token: str = ""
-    extended_token: str = ""  # Long-lived read-only token
-    user_id: str = ""  # Upstox UCC
-    exchanges: list[str] = field(default_factory=list)  # e.g. ["NSE", "BSE"]
-    products: list[str] = field(default_factory=list)  # e.g. ["I", "D"]
-
-    @property
-    def is_expired(self) -> bool:
-        # Add 5-minute buffer before actual expiry
-        return time.time() >= (self.expires_at - 300)
 
 
 class UpstoxOAuth2:
