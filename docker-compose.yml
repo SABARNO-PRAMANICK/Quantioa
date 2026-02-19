@@ -170,6 +170,9 @@ services:
       REDIS_URL: redis://redis:6379/2
       POSTGRES_URL: postgresql://quantioa:${POSTGRES_PASSWORD}@postgres:5432/quantioa
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      PERPLEXITY_MODEL: ${PERPLEXITY_MODEL}
     depends_on:
       postgres:
         condition: service_healthy
