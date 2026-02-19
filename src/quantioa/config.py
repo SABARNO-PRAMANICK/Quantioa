@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_url: str = "redis://localhost:6379/0"
 
+    # --- Kafka ---
+    kafka_bootstrap_servers: str = "localhost:9092"
+
     # --- JWT Auth ---
     jwt_secret_key: str = ""  # REQUIRED — set via JWT_SECRET_KEY env var
     jwt_algorithm: str = "HS256"
