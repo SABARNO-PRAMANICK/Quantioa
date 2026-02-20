@@ -1,9 +1,9 @@
 """
-Increment 7: AI Parameter Optimization via Kimi K2.5 + LangGraph.
+Increment 7: AI Parameter Optimization via LangGraph.
 
-Replaces the original raw-httpx DeepSeek integration with:
+Replaces the original raw-httpx integration with:
 - OpenAI SDK (pointed at OpenRouter)
-- Kimi K2.5 with reasoning mode for chain-of-thought optimization
+- Configured AI model with reasoning mode for chain-of-thought optimization
 - LangGraph for multi-step decision workflows
 
 This module provides both direct optimization and the full
@@ -36,7 +36,7 @@ class OptimizationResult:
 
 
 class AIOptimizer:
-    """AI-driven parameter optimization using Kimi K2.5 via LangGraph.
+    """AI-driven parameter optimization using the configured AI model via LangGraph.
 
     Usage (simple):
         optimizer = AIOptimizer()
@@ -100,7 +100,7 @@ class AIOptimizer:
     ) -> OptimizationResult:
         """Run the full LangGraph decision pipeline.
 
-        Executes: analyze → optimize (Kimi K2.5 reasoning) → sentiment
+        Executes: analyze → optimize (AI reasoning) → sentiment
         (Perplexity) → validate (continued reasoning) → signal.
         """
         initial_state: TradingDecisionState = {

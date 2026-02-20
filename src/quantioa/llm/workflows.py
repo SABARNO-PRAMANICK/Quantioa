@@ -9,7 +9,7 @@ Models the AI-augmented trading decision pipeline as a stateful graph:
     └──────┬───────┘
            │
     ┌──────▼───────┐
-    │  Optimize    │ ← Kimi K2.5 with reasoning
+    │  Optimize    │ ← AI model with reasoning
     │  Parameters  │
     └──────┬───────┘
            │
@@ -19,7 +19,7 @@ Models the AI-augmented trading decision pipeline as a stateful graph:
     └──────┬───────┘
            │
     ┌──────▼───────┐
-    │  Validate    │ ← Kimi K2.5 (continued reasoning)
+    │  Validate    │ ← AI model (continued reasoning)
     │  Decision    │
     └──────┬───────┘
            │
@@ -104,7 +104,7 @@ async def analyze_performance(state: TradingDecisionState) -> TradingDecisionSta
 
 
 async def optimize_parameters(state: TradingDecisionState) -> TradingDecisionState:
-    """Node 2: Ask Kimi K2.5 to suggest parameter optimizations.
+    """Node 2: Ask the configured AI model to suggest parameter optimizations.
 
     Uses reasoning mode so the model shows its chain-of-thought
     about why specific parameter changes would improve performance.
@@ -184,7 +184,7 @@ async def analyze_sentiment(state: TradingDecisionState) -> TradingDecisionState
 async def validate_decision(state: TradingDecisionState) -> TradingDecisionState:
     """Node 4: Validate the optimization with continued reasoning.
 
-    Uses chat_continuation to have Kimi K2.5 review its own
+    Uses chat_continuation to have the AI model review its own
     parameter suggestions against the sentiment data — the model
     continues reasoning from where it left off.
     """

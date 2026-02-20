@@ -2,13 +2,13 @@
 AI/LLM Service — orchestrates AI model calls via OpenRouter + LangGraph.
 
 Models:
-- Kimi K2.5 (moonshotai/kimi-k2.5) — primary AI with reasoning mode
+- Primary AI model (configured via AI_MODEL env var) — with reasoning mode
 - Perplexity Sonar Pro — sentiment analysis and news aggregation
 
 Workflows:
 - Parameter optimization (LangGraph pipeline)
 - Sentiment analysis (Perplexity)
-- Quick chat (single-turn Kimi K2.5)
+- Quick chat (single-turn with the configured model)
 """
 
 from __future__ import annotations
@@ -97,10 +97,10 @@ async def health():
 async def optimize_parameters(req: OptimizationRequest):
     """Run the full LangGraph optimization pipeline.
 
-    Pipeline: analyze → optimize (Kimi K2.5 reasoning) → sentiment
+    Pipeline: analyze → optimize (AI reasoning) → sentiment
     (Perplexity) → validate (continued reasoning) → signal.
     """
-    from quantioa.increments.inc7_deepseek import AIOptimizer
+    from quantioa.increments.inc7_ai_optimizer import AIOptimizer
 
     optimizer = AIOptimizer()
     result = await optimizer.run_full_pipeline(
@@ -122,7 +122,7 @@ async def optimize_parameters(req: OptimizationRequest):
 @app.post("/optimize/simple")
 async def optimize_simple(req: OptimizationRequest):
     """Quick single-call optimization (no sentiment, no LangGraph)."""
-    from quantioa.increments.inc7_deepseek import AIOptimizer
+    from quantioa.increments.inc7_ai_optimizer import AIOptimizer
 
     optimizer = AIOptimizer()
     result = await optimizer.optimize(
@@ -194,7 +194,7 @@ async def refresh_sentiment(symbol: str):
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    """Direct chat with Kimi K2.5 (with optional reasoning)."""
+    """Direct chat with the configured AI model (with optional reasoning)."""
     from quantioa.llm.client import chat_with_reasoning
 
     messages = []

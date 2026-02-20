@@ -2,7 +2,7 @@
 LLM client — OpenAI SDK wrapper for OpenRouter.
 
 Uses the openai SDK with base_url pointed at OpenRouter.
-Supports Kimi K2.5 reasoning mode with chain-of-thought continuation.
+Supports reasoning mode with chain-of-thought continuation for compatible models.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ async def chat_with_reasoning(
     max_tokens: int = 4096,
     enable_reasoning: bool = True,
 ) -> dict[str, Any]:
-    """Call Kimi K2.5 with reasoning enabled.
+    """Call the configured AI model with reasoning enabled.
 
     Supports multi-turn reasoning continuation by preserving
     `reasoning_details` in the assistant message.
@@ -109,7 +109,7 @@ async def chat_continuation(
 ) -> dict[str, Any]:
     """Continue a reasoning chain by preserving reasoning_details.
 
-    This is the Kimi K2.5-specific feature where the model can
+    This is a reasoning-mode feature where the model can
     continue reasoning from where it left off.
 
     Args:

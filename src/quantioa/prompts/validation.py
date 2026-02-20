@@ -3,7 +3,7 @@ Validation prompts — used by the decision validation workflow node.
 
 Covers:
 - Node 4 (validate_decision) in the LangGraph pipeline
-- Multi-turn reasoning continuation with Kimi K2.5
+- Multi-turn reasoning continuation with the configured AI model
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def followup_prompt(
 ) -> str:
     """Build the followup message that continues the reasoning chain.
 
-    This is passed to chat_continuation() so Kimi K2.5 can validate
+    This is passed to chat_continuation() so the AI model can validate
     its optimization suggestions against sentiment data.
     """
     return (

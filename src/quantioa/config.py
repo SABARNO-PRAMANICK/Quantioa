@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     zerodha_auth_url: str = "https://kite.zerodha.com/connect/login"
 
 
-    # --- OpenRouter (DeepSeek + Perplexity) ---
+    # --- OpenRouter (AI model + Perplexity) ---
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ai_model: str = "moonshotai/kimi-k2.5"

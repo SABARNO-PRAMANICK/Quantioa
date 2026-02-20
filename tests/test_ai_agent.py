@@ -3,7 +3,7 @@ End-to-end test of the AI trading decision pipeline.
 
 Tests:
 1. Simple LLM call (ping)
-2. Kimi K2.5 reasoning mode
+2. AI model reasoning mode
 3. Full LangGraph trading decision workflow
 4. Trading loop with paper broker (50 synthetic ticks + AI optimization)
 
@@ -95,11 +95,11 @@ async def test_llm_ping() -> bool:
         return False
 
 
-# ── Test 2: Kimi K2.5 Reasoning Mode ──────────────────────────────────────────
+# ── Test 2: AI Model Reasoning Mode ───────────────────────────────────────────
 
 async def test_reasoning_mode() -> bool:
-    """Test Kimi K2.5's chain-of-thought reasoning."""
-    header("Test 2: Kimi K2.5 Reasoning Mode")
+    """Test AI model's chain-of-thought reasoning."""
+    header("Test 2: AI Model Reasoning Mode")
 
     from quantioa.llm.client import chat_with_reasoning
 

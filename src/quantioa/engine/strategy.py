@@ -19,7 +19,7 @@ class AITradingStrategy:
     Integrates:
     1. Market Data (Ticks/Indicators)
     2. Sentiment Analysis (Perplexity)
-    3. Reasoning Engine (LangGraph + Kimi/OpenRouter)
+    3. Reasoning Engine (LangGraph + configured AI model via OpenRouter)
     """
 
     def __init__(self, symbol: str, cache: SentimentCache | None = None):
