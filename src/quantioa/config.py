@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     ai_model: str = "moonshotai/kimi-k2.5"
     perplexity_model: str = "perplexity/sonar-pro"
 
+    # --- Database ---
+    postgres_url: str = "postgresql://quantioa:quantioa_dev_pass@localhost:5432/quantioa"
+
     # --- Redis ---
     redis_url: str = "redis://localhost:6379/0"
 
