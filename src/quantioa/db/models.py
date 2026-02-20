@@ -196,9 +196,10 @@ class Trade(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     slippage_pct: Mapped[float] = mapped_column(Numeric(10, 6), default=0.0)
 
-    # Strategy
+    # Strategy + SEBI Algo ID
     strategy_id: Mapped[str] = mapped_column(String(64), default="")
     strategy_type: Mapped[str] = mapped_column(String(32), default="")
+    algo_id: Mapped[str] = mapped_column(String(32), default="")  # Exchange-assigned algo ID
     signal_strength: Mapped[float] = mapped_column(Float, default=0.0)
     signal_confidence: Mapped[float] = mapped_column(Float, default=0.0)
 
