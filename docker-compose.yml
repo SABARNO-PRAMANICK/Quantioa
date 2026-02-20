@@ -8,7 +8,7 @@
 #   - trading-engine  : Signal generation + trade execution (port 8002)
 #   - data-service    : Market data collection + streaming (port 8003)
 #   - risk-service    : Risk management + circuit breakers (port 8004)
-#   - ai-service      : AI/LLM orchestration (Kimi K2.5 + Perplexity) (port 8005)
+#   - ai-service      : AI/LLM orchestration (via OpenRouter) (port 8005)
 #   - analytics       : Performance tracking + metrics (port 8006)
 #   - broker-service  : Broker integration (Upstox) (port 8007)
 #
