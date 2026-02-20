@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     min_risk_reward_ratio: float = 1.5
     min_mtf_agreement: float = 0.67
 
+    # --- Portfolio Allocator Constraints ---
+    max_positions: int = 6
+    max_per_stock_pct: float = 0.20
+    max_per_sector_pct: float = 0.35
+    min_cash_reserve_pct: float = 0.15
+    correlation_threshold: float = 0.7
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 

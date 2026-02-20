@@ -10,11 +10,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 from aiokafka import AIOKafkaConsumer
+import httpx
 
 from quantioa.config import settings
 from quantioa.engine.strategy import AITradingStrategy
-from quantioa.models.types import Tick, Position
+from quantioa.models.enums import TradeSide
+from quantioa.models.types import Tick, Position, Order
 from quantioa.services.sentiment.cache import SentimentCache
+from quantioa.portfolio.manager import PortfolioManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,11 @@ logger = logging.getLogger(__name__)
 strategies: dict[str, AITradingStrategy] = {}
 kafka_consumer: AIOKafkaConsumer | None = None
 sentiment_cache: SentimentCache = SentimentCache()
+portfolio_manager: PortfolioManager = PortfolioManager()
+
+# Simulated state for position tracking
+current_positions: dict[str, float] = {}
+available_capital: float = 100_000.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +68,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Quantioa Trading Engine", version="0.1.0", lifespan=lifespan)
 
+async def _execute_trade(symbol: str, side: str, capital_allocation: float):
+    # Minimal stub to determine quantity. In production: fetch real price -> calculate qty
+    # Assuming avg price ~1000 for mock testing purposes
+    qty = max(int(capital_allocation / 1000.0), 1)
+    
+    order = Order(
+        symbol=symbol,
+        side=TradeSide.LONG if side == "BUY" else TradeSide.SHORT,
+        quantity=qty
+    )
+    
+    headers = {
+        "broker_type": "UPSTOX",
+        "user_id": "system_user"  # In multi-tenant, this comes from context
+    }
+    
+    # We use the docker compose internal hostname: quantioa-broker
+    # Note: If running locally outside docker, use localhost:8007
+    url = "http://quantioa-broker:8000/orders"
+    broker_host = os.environ.get("BROKER_SERVICE_URL", url)
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                broker_host,
+                json=order.__dict__,
+                headers=headers
+            )
+            resp.raise_for_status()
+            logger.info("Successfully executed %s order via broker for %s", side, symbol)
+    except Exception as e:
+        logger.error("Failed to execute %s order for %s: %s", side, symbol, e)
+
+
 async def process_ticks():
     """Consume ticks from Kafka and feed them to strategies."""
     if not kafka_consumer:
@@ -93,12 +135,46 @@ async def process_ticks():
                 }
                 position = None # await broker.get_position(symbol)
 
+                # Update rolling correlation price history
+                if tick.close > 0:
+                    portfolio_manager.update_price_history(symbol, tick.close)
+
                 # Execute Strategy Logic
                 decision = await strategy.on_tick(tick, indicators, position)
                 
-                if decision["signal"] in ("BUY", "SELL"):
-                    logger.info("TRADE DETECTED: %s %s", decision["signal"], symbol)
-                    # TODO: Execute trade via Broker Service
+                signal = decision["signal"]
+                if signal in ("BUY", "SELL"):
+                    logger.info("TRADE DETECTED: %s %s", signal, symbol)
+                    
+                    if signal == "BUY":
+                        allowed = portfolio_manager.is_trade_allowed(symbol, list(current_positions.keys()))
+                        if allowed:
+                            allocated = portfolio_manager.allocate_capital(
+                                symbol=symbol, 
+                                total_equity=available_capital, 
+                                current_positions=current_positions
+                            )
+                            if allocated > 0:
+                                logger.info("Portfolio Manager ALLOWED BUY %s: Allocated ₹%.2f", symbol, allocated)
+                                current_positions[symbol] = current_positions.get(symbol, 0.0) + allocated
+                                await _execute_trade(symbol, "BUY", allocated)
+                            else:
+                                logger.info("Portfolio Manager REJECTED BUY %s: Allocation limits reached", symbol)
+                        else:
+                            logger.info("Portfolio Manager REJECTED BUY %s: High correlation or limit breach", symbol)
+                    
+                    elif signal == "SELL":
+                        if symbol in current_positions:
+                            logger.info("Portfolio Manager CLOSING POSITION %s", symbol)
+                            allocated_amount = current_positions[symbol]
+                            del current_positions[symbol]
+                            await _execute_trade(symbol, "SELL", allocated_amount)
+
+                # Periodic Drift Check
+                rebalance_actions = portfolio_manager.check_rebalance_needs(available_capital, current_positions)
+                for action in rebalance_actions:
+                    logger.info("REBALANCE REQUIRED for %s: Reduce exposure by ₹%.2f (%s)", 
+                                action["symbol"], action["amount_to_reduce"], action["reason"])
 
     except Exception as e:
         logger.error("Tick processing error: %s", e)
