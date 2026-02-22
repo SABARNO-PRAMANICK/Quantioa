@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+import time
 
 from fastapi import FastAPI
 import uvicorn
@@ -68,10 +69,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Quantioa Trading Engine", version="0.1.0", lifespan=lifespan)
 
-async def _execute_trade(symbol: str, side: str, capital_allocation: float):
-    # Minimal stub to determine quantity. In production: fetch real price -> calculate qty
-    # Assuming avg price ~1000 for mock testing purposes
-    qty = max(int(capital_allocation / 1000.0), 1)
+async def _execute_trade(symbol: str, side: str, capital_allocation: float, current_price: float):
+    # Determine quantity based on live market price
+    if current_price <= 0:
+        logger.error("Invalid current price for %s: %s", symbol, current_price)
+        return
+        
+    qty = max(int(capital_allocation / current_price), 1)
     
     order = Order(
         symbol=symbol,
@@ -111,6 +115,16 @@ async def process_ticks():
         async for msg in kafka_consumer:
             data = msg.value
             symbol = data.get("symbol")
+            
+            # --- Latency Tracking ---
+            t1_ns = time.time_ns()
+            t0_ns = data.get("_t0_kafka_in_ns", t1_ns)
+            latency_ms = (t1_ns - t0_ns) / 1_000_000.0
+            
+            if latency_ms > 25.0:
+                logger.warning("High Latency Detected for %s: %.2f ms (Budget: <25ms)", symbol, latency_ms)
+            else:
+                logger.debug("Tick Latency for %s: %.2f ms", symbol, latency_ms)
             
             if symbol in strategies:
                 strategy = strategies[symbol]
@@ -157,7 +171,7 @@ async def process_ticks():
                             if allocated > 0:
                                 logger.info("Portfolio Manager ALLOWED BUY %s: Allocated ₹%.2f", symbol, allocated)
                                 current_positions[symbol] = current_positions.get(symbol, 0.0) + allocated
-                                await _execute_trade(symbol, "BUY", allocated)
+                                await _execute_trade(symbol, "BUY", allocated, tick.close)
                             else:
                                 logger.info("Portfolio Manager REJECTED BUY %s: Allocation limits reached", symbol)
                         else:
@@ -168,7 +182,7 @@ async def process_ticks():
                             logger.info("Portfolio Manager CLOSING POSITION %s", symbol)
                             allocated_amount = current_positions[symbol]
                             del current_positions[symbol]
-                            await _execute_trade(symbol, "SELL", allocated_amount)
+                            await _execute_trade(symbol, "SELL", allocated_amount, tick.close)
 
                 # Periodic Drift Check
                 rebalance_actions = portfolio_manager.check_rebalance_needs(available_capital, current_positions)
