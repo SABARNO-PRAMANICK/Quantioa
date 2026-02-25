@@ -286,3 +286,92 @@ class ExecutionPlan:
     predicted_slippage_pct: float
     predicted_cost: float
     reasoning: str = ""
+
+
+@dataclass
+class ChildOrder:
+    """A single child fill within a TWAP/VWAP parent execution."""
+
+    order_id: str
+    sequence: int  # 1-indexed slice number
+    quantity: int
+    target_price: float = 0.0
+    filled_price: float = 0.0
+    filled_quantity: int = 0
+    status: OrderStatus = OrderStatus.PENDING
+    scheduled_time: float = 0.0  # Unix timestamp for when this slice fires
+    executed_time: float = 0.0
+    slippage_bps: float = 0.0  # Actual slippage in basis points
+
+
+@dataclass
+class ParentOrder:
+    """A parent order that may be split into child orders by TWAP/VWAP."""
+
+    parent_id: str
+    symbol: str
+    side: TradeSide
+    total_quantity: int
+    strategy: ExecutionStrategy
+    children: list[ChildOrder] = field(default_factory=list)
+    filled_quantity: int = 0
+    average_fill_price: float = 0.0
+    created_at: float = 0.0
+    completed_at: float = 0.0
+    is_complete: bool = False
+
+    @property
+    def remaining_quantity(self) -> int:
+        return self.total_quantity - self.filled_quantity
+
+    @property
+    def total_slippage_bps(self) -> float:
+        if not self.children:
+            return 0.0
+        filled = [c for c in self.children if c.filled_quantity > 0]
+        if not filled:
+            return 0.0
+        return sum(c.slippage_bps * c.filled_quantity for c in filled) / sum(
+            c.filled_quantity for c in filled
+        )
+
+
+@dataclass
+class IntentToTrade:
+    """AI decision payload — emitted after the LLM finishes reasoning.
+
+    The Trading Loop reads this after AI completes, then fetches fresh
+    market data before executing.
+    """
+
+    symbol: str
+    signal: TradeSignal
+    confidence: float
+    reasoning: str = ""
+    suggested_quantity: int = 0
+    suggested_stop_loss: float = 0.0
+    suggested_target: float = 0.0
+    ai_model: str = ""
+    decision_timestamp: float = 0.0  # When the AI finished reasoning
+    context_age_seconds: float = 0.0  # How old the input data was
+
+
+@dataclass
+class ExecutionMetrics:
+    """Per-cycle latency and slippage tracking for the execution engine."""
+
+    # Latency breakdown (microseconds)
+    signal_gen_us: float = 0.0
+    ai_decision_ms: float = 0.0  # AI call duration (milliseconds)
+    data_refresh_us: float = 0.0  # Fresh data fetch after AI completes
+    increment_reeval_us: float = 0.0  # Re-evaluation of OFI/Kelly/Vol
+    slippage_calc_us: float = 0.0
+    order_submit_us: float = 0.0
+    total_execution_us: float = 0.0  # End-to-end after AI returns
+
+    # Slippage
+    predicted_slippage_bps: float = 0.0
+    actual_slippage_bps: float = 0.0
+
+    # Broker reported
+    broker_latency_ms: int = 0

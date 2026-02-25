@@ -263,6 +263,11 @@ class UpstoxAdapter(BrokerAdapter):
             latency = int(metadata.get("latency", 0))
             if latency > 0:
                 logger.debug("V3 order latency: %d ms", latency)
+            if latency > 5:
+                logger.warning(
+                    "V3 order latency %dms exceeds 5ms target (symbol=%s)",
+                    latency, order.symbol,
+                )
 
             return OrderResponse(
                 order_id=order_data.get("order_id", ""),
