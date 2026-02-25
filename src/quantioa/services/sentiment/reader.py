@@ -13,7 +13,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from quantioa.services.sentiment.cache import SentimentCache
 
@@ -21,6 +21,31 @@ logger = logging.getLogger(__name__)
 
 # If cache is older than this, mark as stale (but still usable)
 STALE_THRESHOLD = 8 * 60 * 60  # 8 hours
+
+
+@dataclass(slots=True)
+class SentimentFactors:
+    domestic_macro: float = 0.0
+    global_cues: float = 0.0
+    sector_specific: float = 0.0
+    institutional_flows: float = 0.0
+    technical_context: float = 0.0
+
+    @classmethod
+    def neutral(cls) -> SentimentFactors:
+        return cls()
+
+    @classmethod
+    def from_dict(cls, d: dict) -> SentimentFactors:
+        if not d:
+            return cls.neutral()
+        return cls(
+            domestic_macro=float(d.get("domestic_macro", {}).get("score", 0.0)),
+            global_cues=float(d.get("global_cues", {}).get("score", 0.0)),
+            sector_specific=float(d.get("sector_specific", {}).get("score", 0.0)),
+            institutional_flows=float(d.get("institutional_flows", {}).get("score", 0.0)),
+            technical_context=float(d.get("technical_context", {}).get("score", 0.0)),
+        )
 
 
 @dataclass
@@ -35,6 +60,9 @@ class CachedSentiment:
     stale: bool          # True if cache is older than 8hrs
     age_hours: float     # How old is this data
     available: bool      # False if no cached data exists
+    factors: SentimentFactors = field(default_factory=SentimentFactors.neutral)
+    risks: list[str] = field(default_factory=list)
+    catalysts: list[str] = field(default_factory=list)
 
     @classmethod
     def neutral(cls, symbol: str) -> CachedSentiment:
@@ -48,6 +76,9 @@ class CachedSentiment:
             stale=True,
             age_hours=0.0,
             available=False,
+            factors=SentimentFactors.neutral(),
+            risks=[],
+            catalysts=[],
         )
 
 
@@ -90,4 +121,7 @@ class SentimentReader:
             stale=stale,
             age_hours=round(age_hours, 1),
             available=True,
+            factors=SentimentFactors.from_dict(data.get("factors", {})),
+            risks=data.get("risks", []),
+            catalysts=data.get("catalysts", []),
         )

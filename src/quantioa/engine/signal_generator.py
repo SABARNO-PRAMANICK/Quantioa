@@ -34,6 +34,9 @@ class SignalOutput:
     kelly_fraction: float = 0.0
     reasoning: str = ""
     recommended_stop_atr_mult: float = 2.0
+    sentiment_score: float = 0.0
+    sentiment_influence: float = 1.0
+    sentiment_stale: bool = True
 
 
 class SignalGenerator:
@@ -45,11 +48,12 @@ class SignalGenerator:
     """
 
     # Weight allocation
-    W_TECHNICAL = 0.40
-    W_OFI = 0.20
-    W_REGIME = 0.15
-    W_MTF = 0.15
-    W_KELLY = 0.10
+    W_TECHNICAL  = 0.35
+    W_OFI        = 0.18
+    W_REGIME     = 0.12
+    W_MTF        = 0.12
+    W_KELLY      = 0.08
+    W_SENTIMENT  = 0.15
 
     def generate(
         self,
@@ -58,6 +62,7 @@ class SignalGenerator:
         regime_result: dict | None = None,
         mtf_result: dict | None = None,
         kelly_result: dict | None = None,
+        sentiment_result: dict | None = None,
     ) -> SignalOutput:
         """Generate a combined trading signal.
 
@@ -67,11 +72,13 @@ class SignalGenerator:
             regime_result: Output from VolatilityRegimeDetector (regime, multiplier)
             mtf_result: Output from MultiTimeframeAnalyzer (agreement, direction)
             kelly_result: Output from KellyCriterionSizer (fraction, size)
+            sentiment_result: Output from SentimentReader + SentimentWeighter
         """
         ofi_result = ofi_result or {}
         regime_result = regime_result or {}
         mtf_result = mtf_result or {}
         kelly_result = kelly_result or {}
+        sentiment_result = sentiment_result or {}
 
         # 1. Technical score from indicators
         tech_score = self._compute_technical_score(indicators)
@@ -95,6 +102,14 @@ class SignalGenerator:
         # 5. Kelly
         kelly_fraction = kelly_result.get("kelly_fraction", 0.0)
 
+        # 6. Sentiment
+        sent_base_score = sentiment_result.get("weighted_score", 0.0)
+        sent_influence = sentiment_result.get("influence_multiplier", 1.0)
+        sent_stale = sentiment_result.get("stale", True)
+        sent_score = sent_base_score * sent_influence
+        if sent_stale:
+            sent_score *= 0.5  # Halve stale sentiment contribution
+
         # ─── Combined Score ────────────────────────────────────────────
         # Directional score: positive = BUY, negative = SELL
         tech_direction = 1.0 if tech_score > 0.5 else (-1.0 if tech_score < -0.5 else 0.0)
@@ -104,6 +119,7 @@ class SignalGenerator:
             + self.W_OFI * ofi_score * ofi_direction
             + self.W_MTF * mtf_agreement * mtf_direction
             + self.W_KELLY * min(kelly_fraction, 0.25)  # cap Kelly influence
+            + self.W_SENTIMENT * sent_score
         )
 
         # Regime adjustment
@@ -127,7 +143,7 @@ class SignalGenerator:
         reasoning = (
             f"Tech={tech_score:+.2f} OFI={ofi_score*ofi_direction:+.2f} "
             f"MTF={mtf_agreement:.1%} Regime={regime.value} "
-            f"Kelly={kelly_fraction:.2f} → {signal.value} "
+            f"Kelly={kelly_fraction:.2f} Sent={sent_score:+.2f} → {signal.value} "
             f"(str={strength:.2f}, conf={confidence:.2f})"
         )
 
@@ -142,6 +158,9 @@ class SignalGenerator:
             mtf_agreement=round(mtf_agreement, 4),
             kelly_fraction=round(kelly_fraction, 4),
             reasoning=reasoning,
+            sentiment_score=round(sent_base_score, 4),
+            sentiment_influence=round(sent_influence, 4),
+            sentiment_stale=sent_stale,
         )
 
     def _compute_technical_score(self, ind: dict) -> float:

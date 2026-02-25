@@ -273,6 +273,10 @@ class SentimentResult:
     sources_count: int = 0
     headlines: list[str] = field(default_factory=list)
     timestamp: float = 0.0
+    factors: dict[str, float] = field(default_factory=dict)
+    risks: list[str] = field(default_factory=list)
+    catalysts: list[str] = field(default_factory=list)
+    weighted_score: float = 0.0  # after regime weighting
 
 
 # ─── Execution ─────────────────────────────────────────────────────────────────

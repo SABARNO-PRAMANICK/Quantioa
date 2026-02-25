@@ -152,8 +152,9 @@ async def analyze_sentiment(state: TradingDecisionState) -> TradingDecisionState
     try:
         from quantioa.services.sentiment.cache import SentimentCache
         from quantioa.services.sentiment.reader import SentimentReader
+        from quantioa.config import settings
 
-        cache = SentimentCache(redis_url=None)  # will use memory fallback
+        cache = SentimentCache(redis_url=settings.redis_url)  # use correct redis URL
         await cache.connect()
         reader = SentimentReader(cache)
         sentiment = await reader.get_sentiment(symbol)
@@ -170,6 +171,13 @@ async def analyze_sentiment(state: TradingDecisionState) -> TradingDecisionState
             **state,
             "sentiment_text": sentiment.summary,
             "sentiment_score": sentiment.score,
+            "sentiment_factors": {
+                "domestic_macro": sentiment.factors.domestic_macro,
+                "global_cues": sentiment.factors.global_cues,
+                "sector_specific": sentiment.factors.sector_specific,
+                "institutional_flows": sentiment.factors.institutional_flows,
+                "technical_context": sentiment.factors.technical_context,
+            }
         }
     except Exception as e:
         logger.error("Sentiment cache read failed: %s", e)

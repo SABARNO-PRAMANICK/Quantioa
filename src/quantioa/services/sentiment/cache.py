@@ -45,9 +45,11 @@ class SentimentCache:
         redis_url: str | None = None,
         ttl: int = DEFAULT_TTL,
     ) -> None:
+        from quantioa.config import settings
+
         self._ttl = ttl
         self._redis = None
-        self._redis_url = redis_url
+        self._redis_url = redis_url or settings.redis_url
         # In-memory fallback: {key: (data_json, expiry_timestamp)}
         self._memory: dict[str, tuple[str, float]] = {}
         self._connected = False

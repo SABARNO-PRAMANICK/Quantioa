@@ -23,6 +23,8 @@ import json
 import logging
 import os
 import sys
+import time
+from dataclasses import dataclass, field
 
 from quantioa.config import settings
 from quantioa.llm.client import sentiment_query
@@ -33,6 +35,34 @@ logger = logging.getLogger(__name__)
 
 # Symbols to track sentiment for
 DEFAULT_SYMBOLS = ["NIFTY50", "BANKNIFTY", "SENSEX"]
+
+
+@dataclass
+class CostTracker:
+    """Track API usage and estimated costs."""
+
+    calls_today: int = 0
+    max_calls_per_day: int = 12      # ~$30-50/month at sonar-pro pricing
+    estimated_cost_per_call: float = 0.15  # conservative estimate
+    daily_budget_usd: float = 2.00
+    last_reset: float = field(default_factory=time.time)
+
+    @property
+    def budget_remaining(self) -> float:
+        return self.daily_budget_usd - (self.calls_today * self.estimated_cost_per_call)
+
+    def can_call(self) -> bool:
+        self._maybe_reset()
+        return self.calls_today < self.max_calls_per_day
+
+    def record_call(self) -> None:
+        self._maybe_reset()
+        self.calls_today += 1
+
+    def _maybe_reset(self) -> None:
+        if time.time() - self.last_reset > 86400:
+            self.calls_today = 0
+            self.last_reset = time.time()
 
 
 class SentimentService:
@@ -61,6 +91,11 @@ class SentimentService:
                 redis_url=redis_url or os.getenv("REDIS_URL") or settings.redis_url,
             )
             self._owns_cache = True
+
+        self.cost_tracker = CostTracker(
+            max_calls_per_day=int(os.getenv("SENTIMENT_MAX_CALLS", "12")),
+            daily_budget_usd=float(os.getenv("SENTIMENT_DAILY_BUDGET", "2.0")),
+        )
 
     async def start(self) -> None:
         """Connect cache and begin refresh loop."""
@@ -101,13 +136,28 @@ class SentimentService:
 
     async def refresh_symbol(self, symbol: str) -> bool:
         """Call Perplexity and cache the result for one symbol."""
-        logger.info("Refreshing sentiment for %s via Perplexity...", symbol)
+        if not self.cost_tracker.can_call():
+            logger.warning(
+                "Skipping Perplexity call for %s: Daily budget exhausted (%d/%d calls used)",
+                symbol,
+                self.cost_tracker.calls_today,
+                self.cost_tracker.max_calls_per_day,
+            )
+            return False
+
+        logger.info(
+            "Refreshing sentiment for %s via Perplexity... (Budget remaining: ~$%.2f)",
+            symbol,
+            self.cost_tracker.budget_remaining,
+        )
 
         try:
             raw = await sentiment_query(
-                prompt=sent_prompts.user_prompt_short(symbol),
-                system_prompt=sent_prompts.SYSTEM_SHORT,
+                prompt=sent_prompts.user_prompt(symbol),
+                system_prompt=sent_prompts.SYSTEM,
             )
+
+            self.cost_tracker.record_call()
 
             logger.info(
                 "Perplexity raw response for %s (%d chars): %s",
@@ -128,6 +178,7 @@ class SentimentService:
                 "risks": parsed.get("risks", []),
                 "catalysts": parsed.get("catalysts", []),
                 "detailed_analysis": str(parsed.get("detailed_analysis", "")),
+                "factors": self._extract_factors(parsed),
                 "source": "perplexity_sonar_pro",
                 "model": settings.perplexity_model,
             }
@@ -184,6 +235,29 @@ class SentimentService:
             "summary": text[:500],
             "headlines": [],
             "confidence": 0.3,
+        }
+
+    @staticmethod
+    def _extract_factors(parsed: dict) -> dict:
+        """Extract multi-dimensional factor scores safely."""
+        factors = parsed.get("factors")
+        if not isinstance(factors, dict):
+            return {}
+
+        def _safe_float(v: dict | float | str | None) -> float:
+            if isinstance(v, dict):
+                return float(v.get("score", 0.0))
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return 0.0
+
+        return {
+            "domestic_macro": {"score": _safe_float(factors.get("domestic_macro"))},
+            "global_cues": {"score": _safe_float(factors.get("global_cues"))},
+            "sector_specific": {"score": _safe_float(factors.get("sector_specific"))},
+            "institutional_flows": {"score": _safe_float(factors.get("institutional_flows"))},
+            "technical_context": {"score": _safe_float(factors.get("technical_context"))},
         }
 
     async def refresh_once(self) -> None:

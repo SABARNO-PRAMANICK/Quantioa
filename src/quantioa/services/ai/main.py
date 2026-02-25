@@ -156,6 +156,15 @@ async def get_sentiment(symbol: str):
         "stale": sentiment.stale,
         "age_hours": sentiment.age_hours,
         "available": sentiment.available,
+        "factors": {
+            "domestic_macro": sentiment.factors.domestic_macro,
+            "global_cues": sentiment.factors.global_cues,
+            "sector_specific": sentiment.factors.sector_specific,
+            "institutional_flows": sentiment.factors.institutional_flows,
+            "technical_context": sentiment.factors.technical_context,
+        },
+        "risks": sentiment.risks,
+        "catalysts": sentiment.catalysts,
     }
 
 
@@ -188,6 +197,13 @@ async def refresh_sentiment(symbol: str):
             "headlines": sentiment.headlines,
             "confidence": sentiment.confidence,
             "available": sentiment.available,
+            "factors": {
+                "domestic_macro": sentiment.factors.domestic_macro,
+                "global_cues": sentiment.factors.global_cues,
+                "sector_specific": sentiment.factors.sector_specific,
+                "institutional_flows": sentiment.factors.institutional_flows,
+                "technical_context": sentiment.factors.technical_context,
+            },
         },
     }
 

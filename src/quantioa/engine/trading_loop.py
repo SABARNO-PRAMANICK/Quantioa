@@ -27,6 +27,7 @@ import time
 from dataclasses import dataclass, field
 
 from quantioa.broker.base import BrokerAdapter
+from quantioa.config import settings
 from quantioa.data.sample_data import generate_order_book
 from quantioa.engine.signal_generator import SignalGenerator, SignalOutput
 from quantioa.engine.trade_confirmation import ConfirmationResult, TradeConfirmation
@@ -35,7 +36,7 @@ from quantioa.increments.inc2_volatility import VolatilityRegimeDetector
 from quantioa.increments.inc4_kelly import KellyCriterionSizer
 from quantioa.increments.inc8_execution import ExecutionManager
 from quantioa.indicators.suite import StreamingIndicatorSuite
-from quantioa.models.enums import ExecutionStrategy, TradeSide
+from quantioa.models.enums import ExecutionStrategy, TradeSide, VolatilityRegime
 from quantioa.models.types import (
     ExecutionMetrics,
     IntentToTrade,
@@ -44,6 +45,9 @@ from quantioa.models.types import (
     TradeResult,
 )
 from quantioa.risk.framework import RiskFramework
+from quantioa.services.sentiment.cache import SentimentCache
+from quantioa.services.sentiment.reader import SentimentReader
+from quantioa.services.sentiment.sentiment_weights import SentimentWeighter
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,11 @@ class LoopStats:
     trades_rejected: int = 0
     stops_hit: int = 0
     total_pnl: float = 0.0
+
+    # Phase 7: Sentiment tracking
+    last_sentiment_score: float = 0.0
+    sentiment_age_hours: float = 0.0
+    sentiment_stale: bool = True
 
     # Phase 6: Execution Optimization metrics
     avg_execution_latency_us: float = 0.0
@@ -124,6 +133,9 @@ class TradingLoop:
             atr_multiplier=atr_multiplier,
         )
         self.execution_mgr = execution_manager or ExecutionManager()
+        self.sentiment_cache = SentimentCache(redis_url=settings.redis_url)
+        self.sentiment_reader = SentimentReader(self.sentiment_cache)
+        self._cache_connected = False
 
         # State
         self.stats = LoopStats()
@@ -185,7 +197,7 @@ class TradingLoop:
                 return result
 
             # Check for exit signal (opposite signal)
-            signal = self._generate_signal(ind_values, tick)
+            signal = await self._generate_signal(ind_values, tick)
             if self._should_exit(signal):
                 pnl = await self._close_position(tick, reason="SIGNAL_EXIT")
                 result["action"] = "EXIT"
@@ -197,7 +209,7 @@ class TradingLoop:
             return result
 
         # 4. Generate signal for new entry
-        signal = self._generate_signal(ind_values, tick)
+        signal = await self._generate_signal(ind_values, tick)
         self._last_signal = signal
         self.stats.signals_generated += 1
         result["signal"] = signal
@@ -226,7 +238,7 @@ class TradingLoop:
         self.stats.trades_attempted += 1
         return result
 
-    def _generate_signal(self, ind: dict, tick: Tick) -> SignalOutput:
+    async def _generate_signal(self, ind: dict, tick: Tick) -> SignalOutput:
         """Run all increments and generate combined signal."""
         # OFI via synthetic order book from tick data
         bias = (tick.close - tick.open) / max(tick.high - tick.low, 0.01)
@@ -244,10 +256,31 @@ class TradingLoop:
         # Volatility regime
         atr = ind.get("atr", tick.close * 0.01)
         regime_result = self.volatility.detect(atr=atr, close_price=tick.close)
+        regime = VolatilityRegime(regime_result.regime.value)
         regime_dict = {
-            "regime": regime_result.regime.value,
+            "regime": regime.value,
             "position_multiplier": regime_result.position_size_multiplier,
         }
+
+        # Sentiment Analysis (Phase 7)
+        if not self._cache_connected:
+            await self.sentiment_cache.connect()
+            self._cache_connected = True
+        
+        sentiment = await self.sentiment_reader.get_sentiment(tick.symbol)
+        sent_weighted, sent_influence = SentimentWeighter.compute_signal_contribution(
+            sentiment.factors, regime
+        )
+        sentiment_dict = {
+            "weighted_score": sent_weighted,
+            "influence_multiplier": sent_influence,
+            "stale": sentiment.stale,
+        }
+        
+        # Track sentiment stats
+        self.stats.last_sentiment_score = sent_weighted
+        self.stats.sentiment_age_hours = sentiment.age_hours
+        self.stats.sentiment_stale = sentiment.stale
 
         # Kelly (uses trade history — returns conservative defaults if not enough history)
         stop_price = tick.close - atr * 2
@@ -266,6 +299,7 @@ class TradingLoop:
             ofi_result=ofi_dict,
             regime_result=regime_dict,
             kelly_result=kelly_dict,
+            sentiment_result=sentiment_dict,
         )
 
     async def _open_position(self, tick: Tick, signal: SignalOutput, atr: float) -> None:
