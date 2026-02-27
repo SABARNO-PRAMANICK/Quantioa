@@ -1,0 +1,137 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Quantioa — Global Design System
+   Deep blood cherry red palette on dark charcoal
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Backgrounds — darkest reds blended with charcoal */
+  --bg-primary: #120408;
+  --bg-secondary: #1a080c;
+  --bg-card: rgba(26, 8, 12, 0.7);
+
+  /* Cherry red palette (light → dark) */
+  --red-100: #AD0021;
+  --red-200: #96092B;
+  --red-300: #7F0D2B;
+  --red-400: #7A0B25;
+  --red-500: #6D061E;
+  --red-600: #630A1F;
+  --red-700: #4F0718;
+  --red-800: #470615;
+  --red-900: #35030F;
+
+  /* Functional aliases */
+  --accent: #AD0021;
+  --accent-hover: #96092B;
+  --accent-muted: #7F0D2B;
+  --accent-glow: rgba(173, 0, 33, 0.5);
+
+  /* Text */
+  --text-primary: #f0ece4;
+  --text-secondary: rgba(240, 236, 228, 0.6);
+  --text-muted: rgba(240, 236, 228, 0.3);
+
+  /* Borders */
+  --border-subtle: rgba(173, 0, 33, 0.12);
+  --border-light: rgba(240, 236, 228, 0.15);
+
+  /* Typography */
+  --font-pixel: 'Silkscreen', cursive;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Space Mono', 'Courier New', monospace;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-default: 0.25s ease;
+}
+
+/* ─── Reset & Base ───────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+/* ─── Keyframe Animations ────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--red-800);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--red-600);
+}
+
+::selection {
+  background: rgba(173, 0, 33, 0.4);
+  color: var(--text-primary);
+}
