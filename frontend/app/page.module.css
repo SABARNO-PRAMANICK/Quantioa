@@ -118,59 +118,6 @@
   animation: fadeIn 1s ease;
 }
 
-/* ─── 3D Artifact Placeholder ────────────────────────────────────────────── */
-.heroPlaceholder {
-  position: relative;
-  width: 400px;
-  height: 400px;
-  margin: 32px 0 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-
-.placeholderGlow {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    var(--accent-glow) 0%,
-    rgba(173, 0, 33, 0.12) 45%,
-    transparent 70%
-  );
-  filter: blur(50px);
-  animation: pulseGlow 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.placeholderBox {
-  position: relative;
-  width: 260px;
-  height: 260px;
-  border: 1px dashed var(--red-500);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 12px;
-  opacity: 0.5;
-}
-
-.placeholderLabel {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.placeholderIcon {
-  font-size: 2rem;
-  opacity: 0.4;
-}
 
 .heroSubtitle {
   font-family: var(--font-mono);
@@ -529,15 +476,6 @@
     padding: 100px 24px 60px;
   }
 
-  .heroPlaceholder {
-    width: 280px;
-    height: 280px;
-  }
-
-  .placeholderBox {
-    width: 180px;
-    height: 180px;
-  }
 
   .statsContainer {
     grid-template-columns: repeat(2, 1fr);

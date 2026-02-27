@@ -61,15 +61,6 @@ export default function Home() {
       <section className={styles.hero} id="hero">
         <h1 className={styles.heroTitle}>Quantioa</h1>
 
-        {/* 3D Artifact Placeholder — will be replaced with user's asset */}
-        <div className={styles.heroPlaceholder}>
-          <div className={styles.placeholderGlow} />
-          <div className={styles.placeholderBox}>
-            <div className={styles.placeholderIcon}>◇</div>
-            <div className={styles.placeholderLabel}>3D Artifact</div>
-          </div>
-        </div>
-
         <p className={styles.heroSubtitle}>
           We are proud to present Quantioa, the AI-powered trading platform.
           A truly unique approach to autonomous trading, underpinned by
