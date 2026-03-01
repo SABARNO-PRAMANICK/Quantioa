@@ -27,9 +27,9 @@
   --accent-glow: rgba(173, 0, 33, 0.5);
 
   /* Text */
-  --text-primary: #f0ece4;
-  --text-secondary: rgba(240, 236, 228, 0.6);
-  --text-muted: rgba(240, 236, 228, 0.3);
+  --text-primary: #FFF0F5;
+  --text-secondary: rgba(255, 240, 245, 0.8);
+  --text-muted: rgba(255, 240, 245, 0.5);
 
   /* Borders */
   --border-subtle: rgba(173, 0, 33, 0.12);

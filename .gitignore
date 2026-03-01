@@ -97,3 +97,10 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# ─── Agents / Skills ───────────────────────────────────────────────────────
+.agents/
+.agent/
+_agents/
+_agent/
+*.zip

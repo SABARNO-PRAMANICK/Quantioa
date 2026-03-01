@@ -1,49 +1,106 @@
+"use client";
+
+import { useRef } from "react";
 import styles from "./page.module.css";
+import SplineBackground from "./components/SplineBackground";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 
 /* Scattered background shapes — deterministic positions */
 const BG_SHAPES = [
-  { top: "8%", left: "12%", delay: "0s", size: 6 },
-  { top: "15%", left: "78%", delay: "1.5s", size: 8 },
-  { top: "25%", left: "45%", delay: "0.8s", size: 5 },
-  { top: "32%", left: "88%", delay: "2.2s", size: 7 },
-  { top: "45%", left: "5%", delay: "0.3s", size: 6 },
-  { top: "52%", left: "65%", delay: "1.8s", size: 9 },
-  { top: "60%", left: "30%", delay: "2.5s", size: 5 },
-  { top: "68%", left: "92%", delay: "0.6s", size: 7 },
-  { top: "75%", left: "18%", delay: "1.2s", size: 8 },
-  { top: "82%", left: "55%", delay: "3s", size: 6 },
-  { top: "10%", left: "35%", delay: "1s", size: 5 },
-  { top: "40%", left: "72%", delay: "2s", size: 7 },
-  { top: "55%", left: "15%", delay: "0.5s", size: 6 },
-  { top: "88%", left: "40%", delay: "1.7s", size: 8 },
-  { top: "20%", left: "60%", delay: "2.8s", size: 5 },
-  { top: "70%", left: "80%", delay: "0.9s", size: 6 },
-  { top: "35%", left: "25%", delay: "3.2s", size: 7 },
-  { top: "90%", left: "70%", delay: "1.4s", size: 5 },
+  { top: "8%", left: "12%", delay: "0s", size: 6, speed: 1.2 },
+  { top: "15%", left: "78%", delay: "1.5s", size: 8, speed: 0.8 },
+  { top: "25%", left: "45%", delay: "0.8s", size: 5, speed: 1.5 },
+  { top: "32%", left: "88%", delay: "2.2s", size: 7, speed: 0.9 },
+  { top: "45%", left: "5%", delay: "0.3s", size: 6, speed: 1.1 },
+  { top: "52%", left: "65%", delay: "1.8s", size: 9, speed: 1.4 },
+  { top: "60%", left: "30%", delay: "2.5s", size: 5, speed: 0.7 },
+  { top: "68%", left: "92%", delay: "0.6s", size: 7, speed: 1.3 },
+  { top: "75%", left: "18%", delay: "1.2s", size: 8, speed: 1.6 },
+  { top: "82%", left: "55%", delay: "3s", size: 6, speed: 0.8 },
+  { top: "10%", left: "35%", delay: "1s", size: 5, speed: 1.2 },
+  { top: "40%", left: "72%", delay: "2s", size: 7, speed: 1.4 },
+  { top: "55%", left: "15%", delay: "0.5s", size: 6, speed: 0.9 },
+  { top: "88%", left: "40%", delay: "1.7s", size: 8, speed: 1.5 },
+  { top: "20%", left: "60%", delay: "2.8s", size: 5, speed: 0.6 },
+  { top: "70%", left: "80%", delay: "0.9s", size: 6, speed: 1.1 },
+  { top: "35%", left: "25%", delay: "3.2s", size: 7, speed: 1.3 },
+  { top: "90%", left: "70%", delay: "1.4s", size: 5, speed: 0.8 },
 ];
 
-export default function Home() {
+function ParallaxShape({ s, smoothProgress }) {
+  const y = useTransform(smoothProgress, [0, 1], ["0vh", `${50 * s.speed}vh`]);
   return (
-    <div className={styles.page}>
+    <motion.div
+      className={styles.bgShape}
+      style={{
+        top: s.top,
+        left: s.left,
+        width: s.size,
+        height: s.size,
+        animationDelay: s.delay,
+        y
+      }}
+    />
+  );
+}
+
+export default function Home() {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  // Parallax properties
+  const splineOpacity = useTransform(smoothProgress, [0, 0.3], [1, 0.4]);
+  const splineBlur = useTransform(smoothProgress, [0, 0.2], ["blur(0px)", "blur(6px)"]);
+  const heroY = useTransform(smoothProgress, [0, 0.2], ["0vh", "30vh"]);
+  const heroOpacity = useTransform(smoothProgress, [0, 0.15], [1, 0]);
+  const heroScale = useTransform(smoothProgress, [0, 0.2], [1, 0.9]);
+
+  // Make stats strip slide in and slightly parallax
+  const statsY = useTransform(smoothProgress, [0, 0.3], ["50px", "0px"]);
+  const statsOpacity = useTransform(smoothProgress, [0.05, 0.15], [0, 1]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 40 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+  };
+
+  return (
+    <div className={styles.page} ref={containerRef}>
       {/* ─── Background Pattern ────────────────────────────────────────── */}
       <div className={styles.bgPattern}>
         {BG_SHAPES.map((s, i) => (
-          <div
-            key={i}
-            className={styles.bgShape}
-            style={{
-              top: s.top,
-              left: s.left,
-              width: s.size,
-              height: s.size,
-              animationDelay: s.delay,
-            }}
-          />
+          <ParallaxShape key={i} s={s} smoothProgress={smoothProgress} />
         ))}
       </div>
 
+      {/* ─── 3D Spline Background ──────────────────────────────────────── */}
+      <motion.div
+        className={styles.splineWrapper}
+        style={{
+          opacity: splineOpacity,
+          filter: splineBlur,
+        }}
+      >
+        <SplineBackground />
+      </motion.div>
+
       {/* ─── Navbar ────────────────────────────────────────────────────── */}
-      <nav className={styles.navbar} id="navbar">
+      <motion.nav 
+        className={styles.navbar} 
+        id="navbar"
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      >
         <a href="/" className={styles.logo}>Q</a>
         <div className={styles.navLinks}>
           <a href="#features" className={styles.navLink}>About</a>
@@ -55,197 +112,202 @@ export default function Home() {
         <a href="#cta">
           <button className={styles.navCta} id="nav-cta">Leave a note</button>
         </a>
-      </nav>
+      </motion.nav>
 
       {/* ─── Hero Section ──────────────────────────────────────────────── */}
-      <section className={styles.hero} id="hero">
-        <h1 className={styles.heroTitle}>Quantioa</h1>
+      <motion.section 
+        className={styles.hero} 
+        id="hero"
+        style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
+      >
+        <motion.h1 
+          className={styles.heroTitle}
+          initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
+        >
+          Quantioa
+        </motion.h1>
 
-        <p className={styles.heroSubtitle}>
-          We are proud to present Quantioa, the AI-powered trading platform.
-          A truly unique approach to autonomous trading, underpinned by
-          institutional-grade risk management and real-time market intelligence
-          built for the Indian markets.
-        </p>
+        <motion.p 
+          className={styles.heroSubtitle}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, delay: 0.6, ease: "easeOut" }}
+        >
+          Systematic quantitative trading infrastructure.
+          Engineered for precision. Driven by logic. Defined by rigorous risk control.
+        </motion.p>
 
-        <div className={styles.heroCursor} />
-      </section>
+        <motion.div 
+          className={styles.heroCursor} 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 2 }}
+        />
+      </motion.section>
 
       {/* ─── Stats Strip ───────────────────────────────────────────────── */}
-      <section className={styles.statsStrip} id="stats">
+      <motion.section 
+        className={styles.statsStrip} 
+        id="stats"
+        style={{ y: statsY, opacity: statsOpacity }}
+      >
         <div className={styles.statsContainer}>
           <div className={styles.statItem}>
-            <div className={styles.statValue}>{"<"}50ms</div>
-            <div className={styles.statLabel}>Execution Latency</div>
+            <div className={styles.statValue}>Optimized</div>
+            <div className={styles.statLabel}>Order Execution</div>
           </div>
           <div className={styles.statItem}>
-            <div className={styles.statValue}>6-Layer</div>
-            <div className={styles.statLabel}>Risk Management</div>
+            <div className={styles.statValue}>Dynamic</div>
+            <div className={styles.statLabel}>Exposure Management</div>
           </div>
           <div className={styles.statItem}>
-            <div className={styles.statValue}>24/7</div>
-            <div className={styles.statLabel}>AI Monitoring</div>
+            <div className={styles.statValue}>Continuous</div>
+            <div className={styles.statLabel}>Market Analysis</div>
           </div>
           <div className={styles.statItem}>
-            <div className={styles.statValue}>SEBI</div>
-            <div className={styles.statLabel}>Fully Compliant</div>
+            <div className={styles.statValue}>Robust</div>
+            <div className={styles.statLabel}>Regulatory Alignment</div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ─── Features Section ──────────────────────────────────────────── */}
       <section className={styles.features} id="features">
         <div className={styles.sectionContainer}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTag}>Core Capabilities</span>
+          <motion.div 
+            className={styles.sectionHeader}
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <span className={styles.sectionTag}>System Architecture</span>
             <h2 className={styles.sectionTitle}>
-              Everything you need to trade intelligently
+              Engineered for absolute operational discipline.
             </h2>
             <p className={styles.sectionSubtitle}>
-              From real-time data ingestion to autonomous execution, every layer
-              is designed for institutional-grade performance.
+              Our infrastructure is designed to transform market complexity
+              into calculated, methodical execution frameworks.
             </p>
-          </div>
+          </motion.div>
 
-          <div className={styles.featuresGrid}>
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>🧠</div>
-              <h3 className={styles.featureTitle}>LLM Strategy Engine</h3>
-              <p className={styles.featureDesc}>
-                Multi-agent LangGraph workflow powered by DeepSeek and OpenRouter.
-                AI analyzes technicals, fundamentals, and sentiment in real-time.
-              </p>
-            </div>
-
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>📡</div>
-              <h3 className={styles.featureTitle}>Live Market Data</h3>
-              <p className={styles.featureDesc}>
-                Upstox WebSocket integration with Kafka streaming delivers
-                sub-50ms tick-to-decision latency for lightning-fast reactions.
-              </p>
-            </div>
-
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>🛡️</div>
-              <h3 className={styles.featureTitle}>6-Layer Risk Framework</h3>
-              <p className={styles.featureDesc}>
-                Position limits, circuit breakers, drawdown protection, volatility
-                guards, kill switch, and portfolio heat management.
-              </p>
-            </div>
-
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>📊</div>
-              <h3 className={styles.featureTitle}>Sentiment Analysis</h3>
-              <p className={styles.featureDesc}>
-                Perplexity-powered real-time news and social sentiment scoring
-                feeds directly into the AI decision pipeline.
-              </p>
-            </div>
-
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>⚡</div>
-              <h3 className={styles.featureTitle}>Fast-Path Execution</h3>
-              <p className={styles.featureDesc}>
-                Critical stop-loss orders bypass the main pipeline via a dedicated
-                fast-path for guaranteed sub-10ms execution.
-              </p>
-            </div>
-
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>🏛️</div>
-              <h3 className={styles.featureTitle}>SEBI Compliant</h3>
-              <p className={styles.featureDesc}>
-                Full regulatory compliance with audit trails, position limits,
-                margin validation, and automated circuit breakers.
-              </p>
-            </div>
-          </div>
+          <motion.div 
+            className={styles.featuresGrid}
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-100px" }}
+          >
+            {[
+              { icon: "🧠", title: "Quantitative Analysis", desc: "Proprietary models evaluate broad market factors systematically to identify statistical probabilities and execute upon aligned scenarios." },
+              { icon: "📡", title: "Data Ingestion pipeline", desc: "Robust information processing ensures our algorithms remain synchronized with shifting market conditions, enabling rapid analytical adaptation." },
+              { icon: "🛡️", title: "Comprehensive Risk Control", desc: "Integrated risk parameters dynamically manage market exposure, strictly enforcing predefined safeguards to protect capital under varying regimes." },
+              { icon: "📊", title: "Adaptive Intelligence", desc: "Heuristics continuously adjust to newly normalized data, ensuring execution directives remain relevant in an evolving landscape." },
+              { icon: "⚡", title: "Optimized Routing", desc: "Advanced logistics govern order placement, prioritizing fill quality while seeking to eliminate operational friction and slippage." },
+              { icon: "🏛️", title: "Strict Accountability", desc: "Constructed with adherence to established compliance standards, delivering transparent operational workflows and rigorous internal auditing." }
+            ].map((feat, i) => (
+              <motion.div key={i} className={styles.featureCard} variants={itemVariants} whileHover={{ y: -10, scale: 1.02 }}>
+                <div className={styles.featureIcon}>{feat.icon}</div>
+                <h3 className={styles.featureTitle}>{feat.title}</h3>
+                <p className={styles.featureDesc}>{feat.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </section>
 
       {/* ─── How It Works ──────────────────────────────────────────────── */}
       <section className={styles.howItWorks} id="how-it-works">
         <div className={styles.sectionContainer}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTag}>How It Works</span>
+          <motion.div 
+            className={styles.sectionHeader}
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <span className={styles.sectionTag}>Execution Lifecycle</span>
             <h2 className={styles.sectionTitle}>
-              From data to execution in milliseconds
+              The anatomy of automated execution.
             </h2>
             <p className={styles.sectionSubtitle}>
-              A fully autonomous pipeline that ingests, analyzes, decides, and
-              executes — all within a single tick.
+              A streamlined, systematic process designed to convert market
+              information into strictly defined actions.
             </p>
-          </div>
+          </motion.div>
 
-          <div className={styles.stepsGrid}>
-            <div className={styles.stepCard}>
-              <div className={styles.stepNumber}>01</div>
-              <h3 className={styles.stepTitle}>Ingest</h3>
-              <p className={styles.stepDesc}>
-                Live market ticks stream through Upstox WebSocket into our Kafka
-                pipeline in real-time.
-              </p>
-              <div className={styles.stepConnector} />
-            </div>
-
-            <div className={styles.stepCard}>
-              <div className={styles.stepNumber}>02</div>
-              <h3 className={styles.stepTitle}>Analyze</h3>
-              <p className={styles.stepDesc}>
-                The AI engine processes technicals, sentiment, and fundamentals
-                through a multi-agent LLM workflow.
-              </p>
-              <div className={styles.stepConnector} />
-            </div>
-
-            <div className={styles.stepCard}>
-              <div className={styles.stepNumber}>03</div>
-              <h3 className={styles.stepTitle}>Decide</h3>
-              <p className={styles.stepDesc}>
-                The strategy synthesizer generates actionable signals with
-                confidence scores and risk parameters.
-              </p>
-              <div className={styles.stepConnector} />
-            </div>
-
-            <div className={styles.stepCard}>
-              <div className={styles.stepNumber}>04</div>
-              <h3 className={styles.stepTitle}>Execute</h3>
-              <p className={styles.stepDesc}>
-                Orders are validated through all 6 risk layers, then routed to
-                Upstox for instant execution.
-              </p>
-            </div>
-          </div>
+          <motion.div 
+            className={styles.stepsGrid}
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-100px" }}
+          >
+            {[
+              { num: "01", title: "Ingest", desc: "The infrastructure continuously normalizes a broad spectrum of global market data streams into actionable formats." },
+              { num: "02", title: "Evaluate", desc: "Quantitative systems process the aggregated information to recognize established statistical patterns." },
+              { num: "03", title: "Validate", desc: "Potential actions undergo rigorous stress tests against active exposure limits and portfolio constraints." },
+              { num: "04", title: "Deploy", desc: "Approved instructions are algorithmically managed for market entry or exit, minimizing slippage footprints." }
+            ].map((step, i) => (
+              <motion.div key={i} className={styles.stepCard} variants={itemVariants}>
+                <div className={styles.stepNumber}>{step.num}</div>
+                <h3 className={styles.stepTitle}>{step.title}</h3>
+                <p className={styles.stepDesc}>{step.desc}</p>
+                {i < 3 && <div className={styles.stepConnector} />}
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </section>
 
       {/* ─── CTA Section ───────────────────────────────────────────────── */}
       <section className={styles.cta} id="cta">
-        <div className={styles.ctaContainer}>
+        <motion.div 
+          className={styles.ctaContainer}
+          initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
+          whileInView={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 1, ease: "easeOut" }}
+        >
           <h2 className={styles.ctaTitle}>
-            Ready to let AI{" "}
-            <span className={styles.ctaAccent}>trade for you?</span>
+            Remove the noise.{" "}
+            <span className={styles.ctaAccent}>Execute with Quantioa.</span>
           </h2>
           <p className={styles.ctaSubtitle}>
-            Join the next generation of intelligent trading. Set up your
-            portfolio, connect your broker, and let Quantioa handle the rest.
+            Leverage professional-grade algorithmic execution —
+            systematic, rigorous, and strictly controlled.
           </p>
-          <div className={styles.ctaButtons}>
+          <motion.div 
+            className={styles.ctaButtons}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+          >
             <a href="/register">
-              <button className={styles.btnPrimary} id="cta-start">
-                Get Started →
-              </button>
+              <motion.button 
+                className={styles.btnPrimary} 
+                id="cta-start"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Get Early Access →
+              </motion.button>
             </a>
             <a href="/docs">
-              <button className={styles.btnOutline} id="cta-docs">
-                View Documentation
-              </button>
+              <motion.button 
+                className={styles.btnOutline} 
+                id="cta-docs"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Learn More
+              </motion.button>
             </a>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* ─── Footer ────────────────────────────────────────────────────── */}
